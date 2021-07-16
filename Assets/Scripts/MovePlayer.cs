@@ -2,49 +2,50 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class MovePlayer : MonoBehaviour
+public class MovePlayer : Fighter
 {
-    public float moveSpeed = 1f;
-    public float rotSpeed = 3f;
-    public float jumpPower = 6f;
-    public float groundedThreshold = .15f;
-    Rigidbody rigidbody;
-    CapsuleCollider capsule;
-    Animator animator;
-    public Transform camera;
-    Vector3 moveDirection;
-    Vector3 initPos;
-    bool grounded;
+    public Transform opponent;
     // Start is called before the first frame update
     void Start()
     {
-        rigidbody = GetComponent<Rigidbody>();
-        capsule = GetComponent<CapsuleCollider>();
-        animator = GetComponent<Animator>();
-        initPos = transform.position;
+        GetCommonComponents();
     }
 
     // Update is called once per frame
     void Update()
     {
+        stateInfo = animator.GetCurrentAnimatorStateInfo(0);
         moveDirection = GetMoveDirection();
-        SetAnimatorParameters();
-        ApplyRootRotation();
+        SetMoveParametersOnAnimator();
         HandleJump();
+        HandleAttack();
+        HandleFallOffPlatform();
+    }
+
+    private void HandleFallOffPlatform()
+    {
         if (transform.position.y < -30f)
             transform.position = initPos;
     }
+
+    private void HandleAttack()
+    {
+        if (Input.GetButtonDown("Fire1"))
+            animator.SetTrigger("Punch");
+    }
+
     private void OnAnimatorMove()
     {
         ApplyRootMotion();
-        
+        Vector3 lookDirection = moveDirection; // by default, personajul se uita in directia deplasarii
+        Vector3 toOpponent = opponent.position - transform.position; //directia de la personaj catre oponent
+        Vector3 toOpponentXoZ = toOpponent;//...>
+        toOpponentXoZ.y = 0f; // aceeasi directie, dar in plan orizontal
+        if (toOpponent.magnitude < 4f) //se uita catre oponent doar daca e la mai putin de 4 metri de acesta
+            lookDirection = toOpponentXoZ.normalized;
+        ApplyRootRotation(lookDirection);
     }
-    private void SetAnimatorParameters()
-    {
-        Vector3 characterSpaceMoveDirection = transform.InverseTransformDirection(moveDirection);
-        animator.SetFloat("Forward", characterSpaceMoveDirection.z, 0.2f, Time.deltaTime);
-        animator.SetFloat("Right", characterSpaceMoveDirection.x, 0.2f, Time.deltaTime);
-    }
+    
     private void ApplyRootMotion()
     {
         if (!grounded)
@@ -58,51 +59,18 @@ public class MovePlayer : MonoBehaviour
 
     private void HandleJump()
     {
-        Ray ray = new Ray();
-        
-        ray.direction = Vector3.down;
-
-        grounded = false;
-        float maxDistance = groundedThreshold;
-        for (float xOffset = -1f; xOffset <= 1f; xOffset += 1f)
-        {
-            for (float zOffset = -1f; zOffset <= 1f; zOffset += 1f)
-            {
-                Vector3 capsuleContourOffset = new Vector3(xOffset, 0f, zOffset).normalized * capsule.radius;
-                ray.origin = transform.position + Vector3.up * groundedThreshold / 2f + capsuleContourOffset;
-                if (Physics.Raycast(ray, maxDistance))
-                {//handle ray intersection, personajul e pe pamant
-                    grounded = true;
-                    Debug.DrawLine(ray.origin, ray.origin + ray.direction * maxDistance, Color.green);
-                }
-                else
-                    Debug.DrawLine(ray.origin, ray.origin + ray.direction * maxDistance, Color.red);
-            }
-        }
-
-        if (grounded)
-        {
-            if (Input.GetButtonUp("Jump"))
-            {
-                Vector3 jumpDir = (Vector3.up + moveDirection).normalized;
-                Debug.DrawLine(transform.position, transform.position + jumpDir * jumpPower, Color.cyan, 1f);
-                rigidbody.AddForce(jumpDir * jumpPower, ForceMode.VelocityChange);
-            }
-        }
+        CheckIfGrounded();
         animator.SetBool("Grounded", grounded);
+
+        if (grounded && Input.GetButtonUp("Jump"))
+        {
+            Vector3 jumpDir = (Vector3.up + moveDirection).normalized;
+            Debug.DrawLine(transform.position, transform.position + jumpDir * jumpPower, Color.cyan, 1f);
+            rigidbody.AddForce(jumpDir * jumpPower, ForceMode.VelocityChange);
+        }
     }
 
-    private void ApplyRootRotation()
-    {
-        if (moveDirection.magnitude < 10e-3f)
-            return;
-
-        Quaternion newRotation = Quaternion.LookRotation(moveDirection, Vector3.up);
-        transform.rotation = Quaternion.Slerp(transform.rotation, newRotation, Time.deltaTime * rotSpeed);
-
-
-    }
-
+  
     private Vector3 GetMoveDirection()
     {
         float moveX = Input.GetAxis("Horizontal"); // -1 pentru tasta A, 1 pentru D, 0 altfel
