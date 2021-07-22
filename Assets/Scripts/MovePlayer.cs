@@ -40,6 +40,9 @@ public class MovePlayer : Fighter
         Vector3 lookDirection = moveDirection; // by default, personajul se uita in directia deplasarii
         Vector3 toOpponent = opponent.position - transform.position; //directia de la personaj catre oponent
         Vector3 toOpponentXoZ = toOpponent;//...>
+        float distToEnemy = toOpponentXoZ.magnitude;
+        animator.SetFloat("distToEnemy", distToEnemy);
+        capsule.radius = 0.3f + (1f - Mathf.Clamp01((distToEnemy - 3f) / 2f)) * 0.15f;
         toOpponentXoZ.y = 0f; // aceeasi directie, dar in plan orizontal
         if (toOpponent.magnitude < 4f) //se uita catre oponent doar daca e la mai putin de 4 metri de acesta
             lookDirection = toOpponentXoZ.normalized;
